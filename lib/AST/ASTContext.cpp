@@ -1847,6 +1847,26 @@ ASTContext::getExtQualType(const Type *baseType, Qualifiers quals) const {
 }
 
 QualType
+ASTContext::getAccessQualType(QualType T, OpenCLImageAccess CLIA) const {
+  QualType CanT = getCanonicalType(T);
+  if (CanT.getAccess() == CLIA)
+    return T;
+
+  // If we are composing extended qualifiers together, merge together
+  // into one ExtQuals node.
+  QualifierCollector Quals;
+  const Type *TypeNode = Quals.strip(T);
+
+  // If this type already has an access qualifier specified, it cannot get
+  // another one.
+  assert(!Quals.hasAccess() &&
+         "Type cannot be have multiple access qualifiers!");
+  Quals.addAccess(CLIA);
+
+  return getExtQualType(TypeNode, Quals);
+}
+
+QualType
 ASTContext::getAddrSpaceQualType(QualType T, unsigned AddressSpace) const {
   QualType CanT = getCanonicalType(T);
   if (CanT.getAddressSpace() == AddressSpace)

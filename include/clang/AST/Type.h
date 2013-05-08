@@ -18,6 +18,7 @@
 #include "clang/Basic/ExceptionSpecificationType.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Linkage.h"
+#include "clang/Basic/OpenCL.h"
 #include "clang/Basic/PartialDiagnostic.h"
 #include "clang/Basic/Visibility.h"
 #include "clang/Basic/Specifiers.h"
@@ -115,9 +116,9 @@ public:
   enum TQ { // NOTE: These flags must be kept in sync with DeclSpec::TQ.
     Const    = 0x1,
     Restrict = 0x2,
-    Volatile = 0x4,
-    CVRMask = Const | Volatile | Restrict
+    Volatile = 0x4
   };
+  static const uint64_t CVRMask = Const | Volatile | Restrict;
 
   enum GC {
     GCNone = 0,
@@ -153,11 +154,10 @@ public:
     MaxAddressSpace = 0xffffffu,
 
     /// The width of the "fast" qualifier mask.
-    FastWidth = 3,
-
-    /// The fast qualifier mask.
-    FastMask = (1 << FastWidth) - 1
+    FastWidth = 3
   };
+  /// The fast qualifier mask.
+  static const uint64_t FastMask = (1 << FastWidth) - 1;
 
   Qualifiers() : Mask(0) {}
 
@@ -199,27 +199,27 @@ public:
     return Q;
   }
 
-  static Qualifiers fromFastMask(unsigned Mask) {
+  static Qualifiers fromFastMask(uint64_t Mask) {
     Qualifiers Qs;
     Qs.addFastQualifiers(Mask);
     return Qs;
   }
 
-  static Qualifiers fromCVRMask(unsigned CVR) {
+  static Qualifiers fromCVRMask(uint64_t CVR) {
     Qualifiers Qs;
     Qs.addCVRQualifiers(CVR);
     return Qs;
   }
 
   // Deserialize qualifiers from an opaque representation.
-  static Qualifiers fromOpaqueValue(unsigned opaque) {
+  static Qualifiers fromOpaqueValue(uint64_t opaque) {
     Qualifiers Qs;
     Qs.Mask = opaque;
     return Qs;
   }
 
   // Serialize these qualifiers into an opaque representation.
-  unsigned getAsOpaqueValue() const {
+  uint64_t getAsOpaqueValue() const {
     return Mask;
   }
 
@@ -246,18 +246,18 @@ public:
 
   bool hasCVRQualifiers() const { return getCVRQualifiers(); }
   unsigned getCVRQualifiers() const { return Mask & CVRMask; }
-  void setCVRQualifiers(unsigned mask) {
+  void setCVRQualifiers(uint64_t mask) {
     assert(!(mask & ~CVRMask) && "bitmask contains non-CVR bits");
     Mask = (Mask & ~CVRMask) | mask;
   }
-  void removeCVRQualifiers(unsigned mask) {
+  void removeCVRQualifiers(uint64_t mask) {
     assert(!(mask & ~CVRMask) && "bitmask contains non-CVR bits");
     Mask &= ~mask;
   }
   void removeCVRQualifiers() {
     removeCVRQualifiers(CVRMask);
   }
-  void addCVRQualifiers(unsigned mask) {
+  void addCVRQualifiers(uint64_t mask) {
     assert(!(mask & ~CVRMask) && "bitmask contains non-CVR bits");
     Mask |= mask;
   }
@@ -309,15 +309,25 @@ public:
     return (lifetime == OCL_Strong || lifetime == OCL_Weak);
   }
 
+  bool hasAccess() const { return Mask & AccessMask; }
+  OpenCLImageAccess getAccess() const {
+    return OpenCLImageAccess((Mask & AccessMask) >> AccessShift);
+  }
+  void setAccess(OpenCLImageAccess CLIA) {
+    Mask = (Mask & ~AccessMask) | (CLIA << AccessShift);
+  }
+  void removeAccess() { setAccess(OpenCLImageAccess(0)); }
+  void addAccess(OpenCLImageAccess CLIA) { setAccess(CLIA); }
+
   bool hasAddressSpace() const { return Mask & AddressSpaceMask; }
   unsigned getAddressSpace() const { return Mask >> AddressSpaceShift; }
-  void setAddressSpace(unsigned space) {
+  void setAddressSpace(uint64_t space) {
     assert(space <= MaxAddressSpace);
     Mask = (Mask & ~AddressSpaceMask)
-         | (((uint32_t) space) << AddressSpaceShift);
+         | (space << AddressSpaceShift);
   }
   void removeAddressSpace() { setAddressSpace(0); }
-  void addAddressSpace(unsigned space) {
+  void addAddressSpace(uint64_t space) {
     assert(space);
     setAddressSpace(space);
   }
@@ -326,18 +336,18 @@ public:
   // on a QualType object.
   bool hasFastQualifiers() const { return getFastQualifiers(); }
   unsigned getFastQualifiers() const { return Mask & FastMask; }
-  void setFastQualifiers(unsigned mask) {
+  void setFastQualifiers(uint64_t mask) {
     assert(!(mask & ~FastMask) && "bitmask contains non-fast qualifier bits");
     Mask = (Mask & ~FastMask) | mask;
   }
-  void removeFastQualifiers(unsigned mask) {
+  void removeFastQualifiers(uint64_t mask) {
     assert(!(mask & ~FastMask) && "bitmask contains non-fast qualifier bits");
     Mask &= ~mask;
   }
   void removeFastQualifiers() {
     removeFastQualifiers(FastMask);
   }
-  void addFastQualifiers(unsigned mask) {
+  void addFastQualifiers(uint64_t mask) {
     assert(!(mask & ~FastMask) && "bitmask contains non-fast qualifier bits");
     Mask |= mask;
   }
@@ -365,6 +375,8 @@ public:
       Mask |= (Q.Mask & CVRMask);
       if (Q.hasAddressSpace())
         addAddressSpace(Q.getAddressSpace());
+      if (Q.hasAccess())
+        addAccess(Q.getAccess());
       if (Q.hasObjCGCAttr())
         addObjCGCAttr(Q.getObjCGCAttr());
       if (Q.hasObjCLifetime())
@@ -384,6 +396,8 @@ public:
         removeObjCGCAttr();
       if (getObjCLifetime() == Q.getObjCLifetime())
         removeObjCLifetime();
+      if (getAccess() == Q.getAccess())
+        removeAccess();
       if (getAddressSpace() == Q.getAddressSpace())
         removeAddressSpace();
     }
@@ -394,6 +408,8 @@ public:
   void addConsistentQualifiers(Qualifiers qs) {
     assert(getAddressSpace() == qs.getAddressSpace() ||
            !hasAddressSpace() || !qs.hasAddressSpace());
+    assert(getAccess() == qs.getAccess() ||
+           !hasAccess() || !qs.hasAccess());
     assert(getObjCGCAttr() == qs.getObjCGCAttr() ||
            !hasObjCGCAttr() || !qs.hasObjCGCAttr());
     assert(getObjCLifetime() == qs.getObjCLifetime() ||
@@ -408,6 +424,8 @@ public:
     return
       // Address spaces must match exactly.
       getAddressSpace() == other.getAddressSpace() &&
+      // Access qualifiers must match exactly.
+      getAccess() == other.getAccess() &&
       // ObjC GC qualifiers can match, be added, or be removed, but can't be
       // changed.
       (getObjCGCAttr() == other.getObjCGCAttr() ||
@@ -479,16 +497,18 @@ public:
 
 private:
 
-  // bits:     |0 1 2|3 .. 4|5  ..  7|8   ...   31|
-  //           |C R V|GCAttr|Lifetime|AddressSpace|
-  uint32_t Mask;
+  // bits:     |0 1 2|3 .. 4|5  ..  7|8 .. 9|10  ...   33|
+  //           |C R V|GCAttr|Lifetime|Access|AddressSpace|
+  uint64_t Mask;
 
-  static const uint32_t GCAttrMask = 0x18;
-  static const uint32_t GCAttrShift = 3;
-  static const uint32_t LifetimeMask = 0xE0;
-  static const uint32_t LifetimeShift = 5;
-  static const uint32_t AddressSpaceMask = ~(CVRMask|GCAttrMask|LifetimeMask);
-  static const uint32_t AddressSpaceShift = 8;
+  static const uint64_t GCAttrMask = 0x18;
+  static const uint64_t GCAttrShift = 3;
+  static const uint64_t LifetimeMask = 0xE0;
+  static const uint64_t LifetimeShift = 5;
+  static const uint64_t AccessMask = 0x300;
+  static const uint64_t AccessShift = 8;
+  static const uint64_t AddressSpaceMask = ~(CVRMask|GCAttrMask|LifetimeMask|AccessMask);
+  static const uint64_t AddressSpaceShift = 10;
 };
 
 /// A std::pair-like structure for storing a qualified type split
@@ -926,6 +946,9 @@ public:
   /// getAddressSpace - Return the address space of this type.
   inline unsigned getAddressSpace() const;
 
+  /// getAccess - Return access qualifiers of this type.
+  inline OpenCLImageAccess getAccess() const;
+
   /// getObjCGCAttr - Returns gc attribute of this type.
   inline Qualifiers::GC getObjCGCAttr() const;
 
@@ -1103,6 +1126,9 @@ public:
   Qualifiers::ObjCLifetime getObjCLifetime() const {
     return Quals.getObjCLifetime();
   }
+
+  bool hasAccess() const { return Quals.hasAccess(); }
+  OpenCLImageAccess getAccess() const { return Quals.getAccess(); }
 
   bool hasAddressSpace() const { return Quals.hasAddressSpace(); }
   unsigned getAddressSpace() const { return Quals.getAddressSpace(); }
@@ -4674,6 +4700,11 @@ inline void QualType::removeLocalCVRQualifiers(unsigned Mask) {
 /// getAddressSpace - Return the address space of this type.
 inline unsigned QualType::getAddressSpace() const {
   return getQualifiers().getAddressSpace();
+}
+
+/// getAccess - Return the access qualifiers of this type.
+inline OpenCLImageAccess QualType::getAccess() const {
+  return getQualifiers().getAccess();
 }
 
 /// getObjCGCAttr - Return the gc attribute of this type.

@@ -1529,6 +1529,22 @@ void Qualifiers::print(raw_ostream &OS, const PrintingPolicy& Policy,
     AppendTypeQualList(OS, quals);
     addSpace = true;
   }
+  if (OpenCLImageAccess clia = getAccess()) {
+    if (addSpace)
+      OS << ' ';
+    addSpace = true;
+    switch (clia) {
+    case CLIA_read_only:
+      OS << "__read_only";
+      break;
+    case CLIA_write_only:
+      OS << "__write_only";
+      break;
+    case CLIA_read_write:
+      OS << "__read_write";
+      break;
+    }
+  }
   if (unsigned addrspace = getAddressSpace()) {
     if (addSpace)
       OS << ' ';

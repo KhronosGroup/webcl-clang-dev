@@ -3981,7 +3981,7 @@ static void HandleOpenCLImageAccessAttribute(QualType& CurType,
   case CLIA_read_only:
   case CLIA_write_only:
   case CLIA_read_write:
-    // Implemented in a separate patch
+    CurType = S.Context.getAccessQualType(CurType, OpenCLImageAccess(iarg));
     break;
   default:
     // Implemented in a separate patch

@@ -774,6 +774,13 @@ private:
   QualType getTypeDeclTypeSlow(const TypeDecl *Decl) const;
 
 public:
+  /// \brief Return the uniqued reference to the type for an access
+  /// qualified type.
+  ///
+  /// The resulting type has a union of the qualifiers from T and the access
+  /// qualifier.
+  QualType getAccessQualType(QualType T, OpenCLImageAccess CLIA) const;
+
   /// \brief Return the uniqued reference to the type for an address space
   /// qualified type with the specified type and address space.
   ///
