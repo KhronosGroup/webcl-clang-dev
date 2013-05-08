@@ -35,6 +35,7 @@ namespace {
     void ProcessDeclGroup(SmallVectorImpl<Decl*>& Decls);
 
     void Print(AccessSpecifier AS);
+    bool IsPrintable(Decl *D);
 
   public:
     DeclPrinter(raw_ostream &Out, const PrintingPolicy &Policy,
@@ -235,6 +236,30 @@ void DeclPrinter::Print(AccessSpecifier AS) {
   }
 }
 
+bool DeclPrinter::IsPrintable(Decl *D) {
+  // Check whether we should print only main file contents.
+  if (!Policy.SuppressAuxFiles)
+    return true;
+
+  // As an optimization, ensure that we are checking a top level
+  // declaration within a translation unit.
+  if (D->getDeclContext()->getDeclKind() != Decl::TranslationUnit)
+    return true;
+
+  // We don't want to print anything that doesn't exist in source code
+  // form.
+  const SourceLocation DeclLocation = D->getLocation();
+  if (!DeclLocation.isValid())
+    return false;
+
+  // We don't want to print anything that has been injected before
+  // user sources.
+  const SourceManager& Manager = D->getASTContext().getSourceManager();
+  const FileID MainId = Manager.getMainFileID();
+  const SourceLocation MainLocation = Manager.getLocForStartOfFile(MainId);
+  return !Manager.isBeforeInTranslationUnit(DeclLocation, MainLocation);
+}
+
 //----------------------------------------------------------------------------
 // Common C declarations
 //----------------------------------------------------------------------------
@@ -249,6 +274,9 @@ void DeclPrinter::VisitDeclContext(DeclContext *DC, bool Indent) {
   SmallVector<Decl*, 2> Decls;
   for (DeclContext::decl_iterator D = DC->decls_begin(), DEnd = DC->decls_end();
        D != DEnd; ++D) {
+
+    if (!IsPrintable(*D))
+      continue;
 
     // Don't print ObjCIvarDecls, as they are printed when visiting the
     // containing ObjCInterfaceDecl.
