@@ -83,6 +83,7 @@ namespace {
     void PrintTemplateParameters(const TemplateParameterList *Params,
                                  const TemplateArgumentList *Args);
     void prettyPrintAttributes(Decl *D);
+    void prettyPrintOpenCLAttributes(Decl *D);
   };
 }
 
@@ -193,13 +194,27 @@ raw_ostream& DeclPrinter::Indent(unsigned Indentation) {
 void DeclPrinter::prettyPrintAttributes(Decl *D) {
   if (Policy.SuppressAttributes)
     return;
-  
   if (D->hasAttrs()) {
     AttrVec &Attrs = D->getAttrs();
     for (AttrVec::const_iterator i=Attrs.begin(), e=Attrs.end(); i!=e; ++i) {
       Attr *A = *i;
       A->printPretty(Out, Policy);
     }
+  }
+}
+
+void DeclPrinter::prettyPrintOpenCLAttributes(Decl *D) {
+  if (Policy.SuppressAttributes)
+    return;
+  if (D->hasAttrs() && D->hasAttr<OpenCLKernelAttr>()) {
+    Out << "__kernel";
+    AttrVec &Attrs = D->getAttrs();
+    for (AttrVec::const_iterator i=Attrs.begin(), e=Attrs.end(); i!=e; ++i) {
+      Attr *A = (*i);
+      if (!isa<OpenCLKernelAttr>(A))
+        A->printPretty(Out, Policy);
+    }
+    Out << ' ';
   }
 }
 
@@ -410,6 +425,9 @@ void DeclPrinter::VisitFunctionDecl(FunctionDecl *D) {
     if (D->isModulePrivate())    Out << "__module_private__ ";
   }
 
+  if (Policy.LangOpts.OpenCL)
+    prettyPrintOpenCLAttributes(D);
+
   PrintingPolicy SubPolicy(Policy);
   SubPolicy.SuppressSpecifiers = false;
   std::string Proto = D->getNameInfo().getAsString();
@@ -552,7 +570,8 @@ void DeclPrinter::VisitFunctionDecl(FunctionDecl *D) {
     Ty.print(Out, Policy, Proto);
   }
 
-  prettyPrintAttributes(D);
+  if (!Policy.LangOpts.OpenCL)
+    prettyPrintAttributes(D);
 
   if (D->isPure())
     Out << " = 0";
