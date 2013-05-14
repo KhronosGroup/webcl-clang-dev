@@ -697,6 +697,7 @@ PragmaOpenCLExtensionHandler::HandlePragma(Preprocessor &PP,
     PP.Diag(Tok.getLocation(), diag::warn_pragma_expected_enable_disable);
     return;
   }
+  SourceLocation StateLoc = Tok.getLocation();
 
   PP.Lex(Tok);
   if (Tok.isNot(tok::eod)) {
@@ -716,5 +717,9 @@ PragmaOpenCLExtensionHandler::HandlePragma(Preprocessor &PP,
   Toks[0].setAnnotationValue(data.getOpaqueValue());
   PP.EnterTokenStream(Toks, 1, /*DisableMacroExpansion=*/true,
                       /*OwnsTokens=*/false);
+
+  if (PPCallbacks *Callbacks = PP.getPPCallbacks()) {
+      Callbacks->PragmaOpenCLExtension(NameLoc, ename, StateLoc, state);
+  }
 }
 

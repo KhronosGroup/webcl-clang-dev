@@ -182,6 +182,12 @@ public:
                                 diag::Mapping mapping, StringRef Str) {
   }
 
+  /// \brief Called when an OpenCL extension is either disabled or
+  /// enabled with a pragma.
+  virtual void PragmaOpenCLExtension(SourceLocation NameLoc, const IdentifierInfo *Name,
+                                     SourceLocation StateLoc, unsigned State) {
+  }
+
   /// \brief Called by Preprocessor::HandleMacroExpandedIdentifier when a
   /// macro invocation is found.
   virtual void MacroExpands(const Token &MacroNameTok, const MacroInfo* MI,
@@ -344,6 +350,12 @@ public:
                                 diag::Mapping mapping, StringRef Str) {
     First->PragmaDiagnostic(Loc, Namespace, mapping, Str);
     Second->PragmaDiagnostic(Loc, Namespace, mapping, Str);
+  }
+
+  virtual void PragmaOpenCLExtension(SourceLocation NameLoc, const IdentifierInfo *Name,
+                                     SourceLocation StateLoc, unsigned State) {
+    First->PragmaOpenCLExtension(NameLoc, Name, StateLoc, State);
+    Second->PragmaOpenCLExtension(NameLoc, Name, StateLoc, State);
   }
 
   virtual void MacroExpands(const Token &MacroNameTok, const MacroInfo* MI,
