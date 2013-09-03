@@ -256,7 +256,7 @@ ClangTool::ClangTool(const CompilationDatabase &Compilations,
       // about the .cc files that were not found, and the use case where I
       // specify all files I want to run over explicitly, where this should
       // be an error. We'll want to add an option for this.
-      llvm::outs() << "Skipping " << File << ". Command line not found.\n";
+      //llvm::outs() << "Skipping " << File << ". Command line not found.\n";
     }
   }
 }
@@ -298,14 +298,14 @@ int ClangTool::run(FrontendActionFactory *ActionFactory) {
       ArgsAdjuster->Adjust(CompileCommands[I].second.CommandLine);
     assert(!CommandLine.empty());
     CommandLine[0] = MainExecutable;
-    llvm::outs() << "Processing: " << File << ".\n";
+    //llvm::outs() << "Processing: " << File << ".\n";
     ToolInvocation Invocation(CommandLine, ActionFactory->create(), &Files);
     for (int I = 0, E = MappedFileContents.size(); I != E; ++I) {
       Invocation.mapVirtualFile(MappedFileContents[I].first,
                                 MappedFileContents[I].second);
     }
     if (!Invocation.run()) {
-      llvm::outs() << "Error while processing " << File << ".\n";
+      //llvm::outs() << "Error while processing " << File << ".\n";
       ProcessingFailed = true;
     }
   }
